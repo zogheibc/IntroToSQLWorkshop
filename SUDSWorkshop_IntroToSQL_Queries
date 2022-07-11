@@ -1,0 +1,246 @@
+--QUERIES USED IN DSI SUDS: INTRO TO SQL WORKSHOP
+--using sample data from https://www.sql-practice.com/
+
+--SELECT statement for extracting columns FROM a table WHERE some condition applies
+--optional ORDER BY to sort results
+SELECT
+  patient_id,
+  first_name,
+  last_name,
+  allergies
+FROM patients
+WHERE allergies NOT NULL
+ORDER BY first_name;
+
+-- Using the COUNT() function to find out how many patients have a NULL allergy record
+SELECT COUNT(patient_id)
+FROM patients
+WHERE allergies IS NULL;
+
+-- UPDATE our patients table by SETting allergies as 'NKA' WHERE it is currently NULL
+UPDATE patients
+SET allergies = 'NKA'
+WHERE allergies IS NULL;
+
+-- ACTIVITY 1
+-- What is the most expensive item that the hospital buys from vendor with id number 4?
+-- use AS to name the MAX() output with an alias
+SELECT MAX(item_cost) AS most_expensive
+FROM items
+WHERE primary_vendor_id = 4;
+
+-- Check our work by viewing all the items from vendor number 4
+SELECT *
+FROM items
+WHERE primary_vendor_id = 4;
+
+-- Combine multiple WHERE conditions using AND or OR operators
+SELECT *
+FROM items
+WHERE primary_vendor_id = 4 OR primary_vendor_id = 8;
+
+SELECT *
+FROM items
+WHERE primary_vendor_id = 4 AND quantity_on_hand <= 10;
+
+-- How much total is the hospital paying vendor 4 based on current quantities of items in stock?
+-- Use ROUND() function to round our result to 2 decimal places since it is a dollar amount
+SELECT
+  ROUND(SUM(item_cost * quantity_on_hand), 2) AS total_cost
+FROM items
+WHERE primary_vendor_id = 4;
+
+-- view our physicians data
+SELECT *
+FROM physicians;
+
+-- convert a column to uppercase
+SELECT UPPER(last_name) 
+FROM physicians;
+
+-- select data based on the length of a text type data field
+SELECT
+  physician_id,
+  first_name
+FROM physicians
+WHERE LEN(first_name) <= 4;
+
+-- concatenating text strings to combine two text columns into one
+SELECT
+  physician_id,
+  CONCAT(last_name, ', ', first_name) AS full_name
+FROM physicians;
+
+-- view admissions table
+SELECT *
+FROM admissions;
+
+-- use YEAR() and MONTH() to get results based on the dates patients were admitted
+SELECT
+  patient_id,
+  admission_date,
+  discharge_date,
+  primary_diagnosis
+FROM admissions
+WHERE YEAR(admission_date) = 2018 AND MONTH(admission_date) = 5;
+
+--Activity: produce a table containing patient_id, the patient’s first and last names combined into one variable called patient_name, and the patient’s allergies, BUT only include data for patients with an allergy to penicillin or morphine  
+SELECT
+  patient_id,
+  CONCAT(first_name, ' ', last_name) AS patient_name,
+  allergies
+FROM patients
+WHERE
+  allergies IN ('Penicillin','Morphine');
+
+-- Use a LIKE operator to search for data similar to something
+SELECT *
+FROM patients;
+
+-- find names starting with 'Dan'
+SELECT *
+FROM patients
+WHERE first_name LIKE 'Dan%';
+
+-- Find names ending with 'an'
+SELECT *
+FROM patients
+WHERE first_name LIKE '%an';
+
+--GROUP BY statements
+--use GROUP BY to count the number of physicians working in each specialty
+SELECT
+  count(physician_id) AS number_of_docs,
+  specialty
+FROM physicians
+GROUP BY specialty;
+
+--use GROUP BY to display the total paid to each vendor
+SELECT
+  ROUND(SUM(item_cost * quantity_on_hand), 2) AS total_paid,
+  primary_vendor_ID
+FROM items
+GROUP BY primary_vendor_id;
+
+-- CASE statements to add a flag/categorical variable to data and name it with an alias
+SELECT
+  patient_id,
+  first_name,
+  province_id,
+  CASE
+    WHEN province_id IS 'ON' THEN 'From Ontario!'
+    ELSE 'Not from Ontario!'
+  END AS from_ontario
+FROM patients;
+
+--Case statements for numerical data?
+SELECT
+  item_id,
+  item_description,
+  CASE
+    WHEN item_cost BETWEEN 0 AND 25 THEN 'Low cost'
+    WHEN item_cost BETWEEN 26 AND 50 THEN 'Mid cost'
+    ELSE 'High cost'
+  END AS cost_category
+FROM items;
+
+--playing with LEFT JOINS
+SELECT
+  patients.patient_id,
+  patients.first_name,
+  patients.last_name,
+  admissions.room,
+  admissions.bed
+FROM patients
+  LEFT JOIN admissions ON patients.patient_id = admissions.patient_id;
+
+--combine a LEFT JOIN and a CASE
+SELECT
+  patients.patient_id,
+  patients.first_name,
+  patients.last_name,
+  CASE
+    WHEN admissions.room IS NOT NULL THEN admissions.room
+    ELSE 'Not Admitted'
+  END AS bed,
+  CASE
+    WHEN admissions.bed IS NOT NULL THEN admissions.bed
+    ELSE 'Not Admitted'
+  END AS bed
+FROM patients
+  LEFT JOIN admissions ON patients.patient_id = admissions.patient_id;
+
+-- Playing with an INNER JOIN
+SELECT
+  patients.patient_id,
+  patients.first_name,
+  patients.last_name,
+  admissions.room,
+  admissions.bed
+FROM patients
+  FULL JOIN admissions ON patients.patient_id = admissions.patient_id;
+
+--JOINing more than two tables, using case statements and a concat to make a new variable
+SELECT
+  patients.patient_id,
+  patients.first_name,
+  patients.last_name,
+  CASE
+    WHEN admissions.room IS NOT NULL THEN admissions.room
+    ELSE 'Not Admitted'
+  END AS bed,
+  CASE
+    WHEN admissions.bed IS NOT NULL THEN admissions.bed
+    ELSE 'Not Admitted'
+  END AS bed,
+  CASE
+    WHEN physicians.physician_id IS NOT NULL THEN CONCAT(
+      physicians.first_name,
+      ' ',
+      physicians.last_name
+    )
+    ELSE 'Not Admitted'
+  END AS doctor
+FROM patients
+  LEFT JOIN admissions ON patients.patient_id = admissions.patient_id
+  LEFT JOIN physicians ON admissions.attending_physician_id = physicians.physician_id;
+
+--use subqueries to select from another selection (from another table)
+--how many males and how many females were admitted with dementia?
+SELECT
+  COUNT(patient_id) AS number_of_dementia_patients,
+  gender
+FROM patients
+WHERE patient_id IN (
+    SELECT patient_id
+    FROM admissions
+    WHERE primary_diagnosis = 'Dementia'
+  )
+GROUP BY gender;
+
+--check our work
+SELECT COUNT(patient_id)
+FROM admissions
+WHERE primary_diagnosis = 'Dementia';
+
+--can also use subqueries all from the same table 
+SELECT
+  item_id,
+  item_cost
+FROM items
+WHERE item_cost > (
+    SELECT AVG(item_cost)
+    FROM items
+  );
+
+--check our work by first calculating avg cost
+SELECT AVG(item_cost)
+FROM items;
+
+--then extracting item_ids for items that cost more than the average
+SELECT
+  item_id,
+  item_cost
+FROM items
+WHERE item_cost > 44.26;
+
